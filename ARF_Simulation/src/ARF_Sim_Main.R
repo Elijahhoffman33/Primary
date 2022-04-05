@@ -392,15 +392,16 @@ for(I in 36:100){
         
         if(First_Iter==(T|F)){
           tmp = try(Main_Wrapper(input_path,training_path,output_locations_path = output_path,
-                                 field_boundary_path = 'ARF_Simulation/data/input/130_boundaries.gpkg',
-                                 output_strata_path =  'ARF_Simulation/data/output/strata_tmp.gz',
-                                 control_fields = F,
-                                 Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
-                                 Force_iRF=F,Output_Summary=T,Cores_Global=8,
-                                 Allow_Default=F,aggregate_at='strata',Max_Splits=7,
-                                 Iterations = 200,Iter_Run = 15,Max_Features=3,
-                                 max_iRF_samples=1000,
-                                 Testing_Run=T,Min_Acres_Sample = 1,export_resamples=T))
+
+                             field_boundary_path = 'ARF_Simulation/data/input/130_boundaries.gpkg',
+                             output_strata_path =  'ARF_Simulation/data/output/strata_tmp.gz',
+                             control_fields = F,
+                             Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
+                             Force_iRF=F,Output_Summary=T,Cores_Global=8,
+                             Allow_Default=F,aggregate_at='strata',Max_Splits=7,
+                             Iterations = 200,Iter_Run = 15,Max_Features=3,
+                             max_iRF_samples=1000,
+                             Testing_Run=T,Min_Acres_Sample = 1,export_resamples=T))
           
           if(class(tmp)=='try-error'){
             break
@@ -558,23 +559,23 @@ Summary = parallel::mclapply(Dirs,mc.cores=1,function(Dir){
   x = lapply(L,'[[','Run_Stats') %>% rbindlist
   x[,Run_Iteration:=paste0(Dir,'_',Run_Iteration)]
   # x[,1:3]
-  
+
   ### Get Results Stats
-  
+
   Mean_SD = lapply(L,function(y){
     
     run_data = y$Run_Data
-    
+
     samples = rbindlist(y$Output_Samples_Resamples,idcol = 'Iter')
     Avgs = samples[,.(True_Mean=mean(run_data$om),True_SD=sd(run_data$om),
-                      
+    
                       Sim_Mean=mean(om),Sim_SD=sd(om),N_Samples=.N),'Iter']
     return(list(Avgs,list(samples=samples)))
   })
-  
+
   Summary = lapply(seq_along(Mean_SD),\(y) {
     cbind( x[y,], '[['(Mean_SD[[y]],1) ) 
-  }) %>% rbindlist 
+    }) %>% rbindlist 
   
   Sample_L = lapply(Mean_SD,\(x) x[[2]]$samples)
   
@@ -656,6 +657,7 @@ ggplot(plot[Iter==1,], aes(x=Index, y=Avg_Mean)) + #col=Control_Clusters,
   geom_point(data=plot,aes(x=Index,y=Sim_Mean,col=Within_5),size=1) + 
   geom_point(data=plot,aes(x=Index,y=True_Mean)) + 
   scale_x_discrete(breaks = 1:47,
+
                    labels = labels) +
   theme(axis.text.x = element_text(angle = 90, vjust = +.5, hjust=0))
 

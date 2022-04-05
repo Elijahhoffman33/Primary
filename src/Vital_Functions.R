@@ -38,6 +38,7 @@ object_size <- function(obj,summary=F,hd=NA){
 }
 
 # object_size('Hek',T,10)
+
 round_df <- function(df, digits) {
   nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
   

@@ -13,11 +13,9 @@ library(tmap)
 
 # source('../Soil_Stratification_Sampling/src/Functions/')
 source('src/Vital_Functions.R')
-source('../Primary/src/Vital_Functions.R')
-
 source('../Soil_Stratification_Sampling/src/Functions/SF_Terra.R')
 # source('src/Functions/Strata_Sampling_Main.R')
-# source('src/Helper_Functions/AWS_Helpers.R')
+source('src/Helper_Functions/AWS_Helpers.R')
 
 
 ### Basemaps setup
