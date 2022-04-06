@@ -17,7 +17,7 @@ Net = Gross*tax
 Net
 ###Contract
 Contract = 8333
-<<<<<<< HEAD
+
 actual_check = Contract*tax/2
 
 paychex_tax = .24

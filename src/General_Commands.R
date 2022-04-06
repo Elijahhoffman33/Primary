@@ -52,12 +52,6 @@ for(i in ls(model_depo[[1]][[2]][[1]]$iRF$model$rf.list)){
   collect <- c(collect,object_size(eval(parse(text=paste('model_depo[[1]][[2]][[1]]$iRF$model$rf.list$',i,sep='')))))
 }
 collect 
-ls(model_depo[[1]][[2]][[1]]$iRF$model$rf.list)[6]
-){
-  collect <- c(collect,object_size(eval(parse(text=i))))
-}
-collect 
-ls[48]
 
 
 ###Create basic text files

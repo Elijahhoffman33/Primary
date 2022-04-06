@@ -279,67 +279,67 @@ bb = bb[c(3,4,1,2)]
 # bb = Poly %>% st_transform(crs = 4269) %>% st_bbox %>% as.numeric()
 # bb = bb[c(3,4,1,2)]
 # bb=c(-337500.000,1242500.000,152500.000,527500.000) # Example bounding box (homolosine)
-get_SD_bb = function(voi,bb){
-  
-  wcs_path = paste0("https://maps.isric.org/mapserv?map=/map/",voi,".map") # Path to the WCS. See maps.isric.org
-  wcs_service = "SERVICE=WCS"
-  wcs_version = "VERSION=2.0.1" # This works for gdal >=2.3; "VERSION=1.1.1" works with gdal < 2.3.
-  
-  
-  
-  wcs_request = "DescribeCoverage"
-  
-  wcs = paste(wcs_path, wcs_service, wcs_version, wcs_request, sep="&")
-  
-  
-  
-  l1 <- newXMLNode("WCS_GDAL")
-  l1.s <- newXMLNode("ServiceURL", wcs, parent=l1)
-  l1.l <- newXMLNode("CoverageName", voi_layer, parent=l1)
-  
-  # Save to local disk
-  xml.out = "./sg1.xml"
-  saveXML(l1, file = xml.out)
-  
-  
-  
-  gdalinfo("./sg1.xml")
-  
-  
-  
-  # bb=c(-337500.000,1242500.000,152500.000,527500.000) # Example bounding box (homolosine)
-  igh='+proj=igh +lat_0=0 +lon_0=0 +datum=WGS84 +units=m +no_defs' # proj string for Homolosine projection
-  igh='EPSG:4326'
-  # 
-  # bb=c(-337500.000,1242500.000,152500.000,527500.000) # Example bounding box (homolosine)
-  # 
-  ###
-  
-  wcs_path = paste0("https://maps.isric.org/mapserv?map=/map/",voi,".map") # Path to the WCS. See maps.isric.org
-  wcs_service = "SERVICE=WCS"
-  wcs_version = "VERSION=2.0.1" # This works for gdal >=2.3; "VERSION=1.1.1" works with gdal < 2.3.
-  
-  wcs = paste(wcs_path,wcs_service,wcs_version,sep="&") # This works for gdal >= 2.3
-  
-  l1 <- newXMLNode("WCS_GDAL")
-  l1.s <- newXMLNode("ServiceURL", wcs, parent=l1)
-  l1.l <- newXMLNode("CoverageName", "soc_5-15cm_mean", parent=l1)
-  
-  # Save to local disk
-  xml.out = "./sg1.xml"
-  saveXML(l1, file = xml.out)
-  
-  # Download raster as GeoTIFF (Warning: it can be large!)
-  file.out <- './test.tif'
-  
-  bb = Poly %>% st_transform(crs = 4326) %>% st_bbox %>% as.numeric()
-  bb[c(4,3,2,1)]
-  bb1=c(-337500.000,1242500.000,152500.000,527500.000) # Example bounding box (homolosine)
-  gdal_translate(xml.out, file.out,
-                 tr=c(250,250), projwin=bb[c(1,2,3)],
-                 projwin_srs =igh, co=c("TILED=YES","COMPRESS=DEFLATE","PREDICTOR=2","BIGTIFF=YES"),
-                 verbose=TRUE)
-  rast('./test.tif') %>% plot
-  unlink('./test.tif')
-
-)
+#get_SD_bb = function(voi,bb){
+#  
+#  wcs_path = paste0("https://maps.isric.org/mapserv?map=/map/",voi,".map") # Path to the WCS. See maps.isric.org
+#  wcs_service = "SERVICE=WCS"
+#  wcs_version = "VERSION=2.0.1" # This works for gdal >=2.3; "VERSION=1.1.1" works with gdal < 2.3.
+#  
+#  
+#  
+#  wcs_request = "DescribeCoverage"
+#  
+#  wcs = paste(wcs_path, wcs_service, wcs_version, wcs_request, sep="&")
+#  
+#  
+#  
+#  l1 <- newXMLNode("WCS_GDAL")
+#  l1.s <- newXMLNode("ServiceURL", wcs, parent=l1)
+#  l1.l <- newXMLNode("CoverageName", voi_layer, parent=l1)
+#  
+#  # Save to local disk
+#  xml.out = "./sg1.xml"
+#  saveXML(l1, file = xml.out)
+#  
+#  
+#  
+#  gdalinfo("./sg1.xml")
+#  
+#  
+#  
+#  # bb=c(-337500.000,1242500.000,152500.000,527500.000) # Example bounding box (homolosine)
+#  igh='+proj=igh +lat_0=0 +lon_0=0 +datum=WGS84 +units=m +no_defs' # proj string for Homolosine projection
+#  igh='EPSG:4326'
+#  # 
+#  # bb=c(-337500.000,1242500.000,152500.000,527500.000) # Example bounding box (homolosine)
+#  # 
+#  ###
+#  
+#  wcs_path = paste0("https://maps.isric.org/mapserv?map=/map/",voi,".map") # Path to the WCS. See maps.isric.org
+#  wcs_service = "SERVICE=WCS"
+#  wcs_version = "VERSION=2.0.1" # This works for gdal >=2.3; "VERSION=1.1.1" works with gdal < 2.3.
+#  
+#  wcs = paste(wcs_path,wcs_service,wcs_version,sep="&") # This works for gdal >= 2.3
+#  
+#  l1 <- newXMLNode("WCS_GDAL")
+#  l1.s <- newXMLNode("ServiceURL", wcs, parent=l1)
+#  l1.l <- newXMLNode("CoverageName", "soc_5-15cm_mean", parent=l1)
+#  
+#  # Save to local disk
+#  xml.out = "./sg1.xml"
+#  saveXML(l1, file = xml.out)
+#  
+#  # Download raster as GeoTIFF (Warning: it can be large!)
+#  file.out <- './test.tif'
+#  
+#  bb = Poly %>% st_transform(crs = 4326) %>% st_bbox %>% as.numeric()
+#  bb[c(4,3,2,1)]
+#  bb1=c(-337500.000,1242500.000,152500.000,527500.000) # Example bounding box (homolosine)
+#  gdal_translate(xml.out, file.out,
+#                 tr=c(250,250), projwin=bb[c(1,2,3)],
+#                 projwin_srs =igh, co=c("TILED=YES","COMPRESS=DEFLATE","PREDICTOR=2","BIGTIFF=YES"),
+#                 verbose=TRUE)
+#  rast('./test.tif') %>% plot
+#  unlink('./test.tif')
+#
+#)
