@@ -7,6 +7,16 @@ source('src/General_Setup_Edit.R')
 paths = c('ARF_Simulation/data/input/Leflore_Inputs/2021_full.gz',
           'ARF_Simulation/data/input/Leflore_Inputs/soil_sample_gdf_generic.pkl',
           'ARF_Simulation/data/input/Leflore_Inputs/soil_samples_raw.pkl')  
+###
+
+# renv::use_python(
+#   python = '/home/elija/miniconda3/envs/arvalib/bin/python',
+#   name='/home/elija/miniconda3/envs/arvalib',
+#   type =  "conda"
+#   )
+# 
+# reticulate::conda_binary('/home/elija/miniconda3/bin/conda')
+###
 
 source('src/Helper_Functions/AWS_Helpers.R')
 L = lapply(paths,get_joblib)
@@ -15,7 +25,9 @@ Env = L[[1]]
 Interp = L[[2]]
 # field_data = st_read('ARF_Simulation/data/input/130_boundaries.gpkg')
 
-colnames(Interp)[!colnames(Interp)%in%colnames(Env)]
+# quick_map(Env,'bg_blue')
+# field_boundaries %>% tm_shape() + tm_polygons(alpha=.5) +
+# tm_shape(samples %>% st_filter(field_boundaries))+tm_dots(alpha=.3)
 
 data = Interp
 data$voxel_id = seq(nrow(data))
@@ -35,17 +47,17 @@ hclusCut <- function(x, k, d.meth = 'ward.D2', ...){
   # list(cluster = cutree(hcut(as.dist(x), method=d.meth), k=k))
 }
 
-data1 = get_SF(data)
-D = samples$WKT %>% st_coordinates() %>% dist 
-cl = hclusCut(D,3)
-samples$cl = cl$cluster
-
-# tm_shape(samples %>% filter(cl!=10)) + tm_dots('cl')
-
-samples$year = samples$sample_date %>% str_split('-') %>% sapply('[[',1)
-samples$year %>% table
-
-samples %>% filter(cl==3) %>% .$year %>% table 
+# data1 = get_SF(data)
+# D = samples$WKT %>% st_coordinates() %>% dist 
+# cl = hclusCut(D,3)
+# samples$cl = cl$cluster
+# 
+# # tm_shape(samples %>% filter(cl!=10)) + tm_dots('cl')
+# 
+# samples$year = samples$sample_date %>% str_split('-') %>% sapply('[[',1)
+# samples$year %>% table
+# 
+# samples %>% filter(cl==3) %>% .$year %>% table 
 # tm_shape(samples %>% filter(cl==1)) + tm_dots('om')
 # x %>% filter(WKT==x[1,]$WKT) %>% .$om
 
@@ -66,36 +78,36 @@ samples %>% filter(cl==3) %>% .$year %>% table
 # data = rbind(data[boundary_id!=0],x)
 
 # field hash -> simpler field ids
-data$field_id = seq(length(unique(data$field_hash)))[factor(data$field_hash)]
-### get boundaries ----
+# data$field_id = seq(length(unique(data$field_hash)))[factor(data$field_hash)]
+### get clusters ----
 
 D = data %>% get_SF %>% st_coordinates %>% dist 
 cl = hclusCut(D,3)
 data$cl = cl$cluster
 tm_shape(data %>% get_SF) + tm_dots('field_id')
 
-### Subset
-data[,.N,'field_id'][order(N),hist(N,150)]
-index = data[,.N,'field_id'][N>10,field_id]
-data = data[field_id%in%index,]
-
-# x = data[cl==1] %>% get_SF
-x = data #%>% get_SF(to_UTM = F)
-# x1 = get_polygon(x,mode='polygon')
-
-polys = lapply(x$field_id %>% unique,\(y){
-  print(y)
-  y1 = get_polygon(x %>% filter(field_id==y) %>% get_SF,mode='polygon')
-  y1$field_id = y
-  y1 %>% st_transform(crs = 4326)
-}) %>% rbindlist %>% st_as_sf
-
-# tm_shape(polys,bbox = st_boundary(polys))+tm_polygons() + tm_shape(data %>% get_SF) + tm_dots() + 
-#   # tm_shape(samples) + tm_dots()
-#   tm_shape(samples) + tm_dots('om')
-
-tm_shape(samples,bbox = st_boundary(polys)) + tm_dots('om')
-
+# ### Subset
+# data[,.N,'field_id'][order(N),hist(N,150)]
+# index = data[,.N,'field_id'][N>10,field_id]
+# data = data[field_id%in%index,]
+# 
+# # x = data[cl==1] %>% get_SF
+# x = data #%>% get_SF(to_UTM = F)
+# # x1 = get_polygon(x,mode='polygon')
+# # 
+# polys = lapply(x$field_id %>% unique,\(y){
+#   print(y)
+#   y1 = get_polygon(x %>% filter(field_id==y) %>% get_SF,mode='polygon')
+#   y1$field_id = y
+#   y1 %>% st_transform(crs = 4326)
+# }) %>% rbindlist %>% st_as_sf
+# 
+# # tm_shape(polys,bbox = st_boundary(polys))+tm_polygons() + tm_shape(data %>% get_SF) + tm_dots() + 
+# #   # tm_shape(samples) + tm_dots()
+# #   tm_shape(samples) + tm_dots('om')
+# 
+# tm_shape(samples,bbox = st_boundary(polys)) + tm_dots('om')
+# 
 
 
 
@@ -140,13 +152,14 @@ tm_shape(samples,bbox = st_boundary(polys)) + tm_dots('om')
 
 ### Subseting ----
 ## Add field data ----
+field_data = st_read('ARF_Simulation/data/input/Leflore_Inputs/field_boundaries.gpkg')
 
 # data$voxel_id = seq(1,nrow(data))+130
-field_data = polys
+# field_data = polys
 
-data = lapply(seq_along(field_data$field),function(x){
+data = mclapply(seq_along(field_data$field),mc.cores=10,function(x){
   tmp = field_data[x,]
-  index = data %>% get_SF(to_UTM = F) %>% st_intersects(tmp$polygons) %>% sapply(sum) %>% '!='(0) %>% which
+  index = data %>% get_SF(to_UTM = F) %>% st_intersects(tmp$geom) %>% sapply(sum) %>% '!='(0) %>% which
   meta = data.table(field_id=tmp$field_id,acres=.25)
   if(nrow(data[index])>0){
     return(data[index,] %>% cbind(meta,.))
@@ -154,7 +167,7 @@ data = lapply(seq_along(field_data$field),function(x){
   
 }) %>% rbindlist
 
-field_boundaries = field_data$polygons
+field_boundaries = field_data$geom
 
 
 #### Add AGTs ----
@@ -201,7 +214,7 @@ quick_map(data,mode='plot',style = 'bclust',Lhist = T,n=6,
 
 
 fwrite(data,'ARF_Simulation/data/temp/data.csv')
-# st_write(field_boundaries,'ARF_Simulation/data/input/Field_Boundaries.gpkg',append=T)
+st_write(field_boundaries,'ARF_Simulation/data/input/Leflore_Field_Boundaries.gpkg',append=T)
 
 ### Create training / subsets ----
 ### Plto eaach region 
@@ -240,7 +253,10 @@ quick_map(x,'cl_sub')
 data[cl==3,cl_sub:=x$cl_sub]
 
 data$cl_sub = as.factor(data$cl_sub)
+
 ### Plot Covariates            
+
+
 data$cl=as.factor(data$cl)
 ggplot(data %>% melt(measure.vars=329:343),aes(x=value,fill=cl_sub))+
   geom_histogram(bins=50,alpha=.8,position = 'identity')+ 
@@ -296,7 +312,7 @@ x2 + tm_shape(buffer,name='True_buffer')+tm_polygons(alpha = .5) +
 
 ### Remove points beyond buffer and write full data
 
-data = data[!index,] 
+# data = data[!index,] 
 
 ### remove tiny fields
 include = data[,table(field_id)>20] %>% which %>%  names %>% as.numeric
