@@ -16,16 +16,8 @@ gg <- ggplot(data=data) + geom_line(aes(x=Minutes,y=Percentage,col=Resource)) +
 gg + theme_classic() 
 
 
-# Print stats
-val <- NCmisc::top(CPU = T,RAM=T)
-tmp <- system2('uptime',stderr=T)
-# cpu <- as.numeric(stringr::str_trim(strsplit(strsplit(tmp,':')[[1]][5],',')[[1]][1]))
-cpu = val$CPU$total
-ram_used <- val$RAM$used*10^6
-ram_free <- val$RAM$free*10^6
-
-data[Resource=='ram',mean(Percentage)]
-data[Resource=='ram',mean(Percentage)] * 24.3888 / 100
+data[Resource=='ram',max(Percentage)]
+data[Resource=='ram',max(Percentage)-min(Percentage)] * 24.3888 / 100
 
 max(subset(data,subset=data$Resource=='cpu')$Percentage)
 max(subset(data,subset=data$Resource=='cpu')$Percentage) * 250 / 100

@@ -213,8 +213,8 @@ quick_map(data,mode='plot',style = 'bclust',Lhist = T,n=6,
 # data = data[-index]
 
 
-fwrite(data,'ARF_Simulation/data/temp/data.csv')
-st_write(field_boundaries,'ARF_Simulation/data/input/Leflore_Field_Boundaries.gpkg',append=T)
+# fwrite(data,'ARF_Simulation/data/temp/data.csv')
+st_write(field_data %>% select(field_id),'ARF_Simulation/data/input/Leflore_Field_Boundaries.gpkg',append=T)
 
 ### Create training / subsets ----
 ### Plot each region 
@@ -255,22 +255,23 @@ data[cl==3,cl_sub:=x$cl_sub]
 data$cl_sub = as.factor(data$cl_sub)
 
 ### Plot Covariates ----
+data$cl=as.factor(data$cl)
+
 ggplot(data %>% melt(measure.vars=331:343),aes(x=value,fill=cl))+
   geom_histogram(bins=50,alpha=.8,position = 'identity')+
   facet_wrap(~variable,scales = 'free') + theme_classic(base_size = 22) + scale_color_brewer(palette = 'Dark2') +
   scale_fill_brewer(palette = 'Dark2')
 
-data$cl=as.factor(data$cl)
-ggplot(data %>% melt(measure.vars=331:343),aes(x=value,fill=cl_sub))+
-  geom_histogram(bins=50,alpha=.8,position = 'identity')+
-  # facet_wrap(~variable + cl,scales = 'free') +
-  trelliscopejs::facet_trelliscope(~variable + cl,scales = 'free',
-                                   path = 'ARF_Simulation/scratch/trellis/.',
-                                   name='Covariate_Histograms',
-                                   nrow = 3, ncol = 4) +#, width = 300) +
-  
-  theme_classic(base_size = 22) + scale_color_brewer(palette = 'Dark2') +
-  scale_fill_brewer(palette = 'Dark2')
+# ggplot(data %>% melt(measure.vars=331:343),aes(x=value,fill=cl_sub))+
+#   geom_histogram(bins=50,alpha=.8,position = 'identity')+
+#   # facet_wrap(~variable + cl,scales = 'free') +
+#   trelliscopejs::facet_trelliscope(~variable + cl,scales = 'free',
+#                                    path = 'ARF_Simulation/scratch/trellis/.',
+#                                    name='Covariate_Histograms',
+#                                    nrow = 3, ncol = 4) +#, width = 300) +
+#   
+#   theme_classic(base_size = 22) + scale_color_brewer(palette = 'Dark2') +
+#   scale_fill_brewer(palette = 'Dark2')
 
 ### Many / densities
 # ggplot(data %>% melt(measure.vars=390:404),aes(x=value,fill=cl))+
@@ -281,7 +282,7 @@ ggplot(data %>% melt(measure.vars=331:343),aes(x=value,fill=cl_sub))+
 
 
 ### Field boundaries plots
-tmp = data %>% get_SF
+# tmp = data %>% get_SF
 
 # ### This one gets concave hull of each field
 # x1 = lapply(unique(data$field_id),function(y){
@@ -289,23 +290,23 @@ tmp = data %>% get_SF
 # }) %>% do.call('rbind',.) %>% st_combine() 
 # x2 + tm_shape(x1)+tm_polygons(alpha = .3)
 
-x2 = quick_map(data,mode='view',SB_Pos = 'left',basemap = T)
+# x2 = quick_map(data,mode='view',SB_Pos = 'left',basemap = T)
 
 ### Use distance from true boundary 
 # x = field_boundaries %>% get_SF %>% st_boundary() %>% st_distance(tmp)
 # tmp$index = (x<set_units(44, m)) %>% apply(2,any)
 
 ### Use buffer from true boundaries 
-buffer = field_boundaries %>% get_SF %>% st_combine %>% st_buffer(-44) 
-y = st_filter(tmp,buffer) #%>% plot(add=T)
-index = st_intersects(tmp,buffer) %>% '!'(.) %>%  apply(1,any)
+# buffer = field_boundaries %>% get_SF %>% st_combine %>% st_buffer(-44) 
+# y = st_filter(tmp,buffer) #%>% plot(add=T)
+# index = st_intersects(tmp,buffer) %>% '!'(.) %>%  apply(1,any)
 
 ### Ploting 
 # x3 =
 # x2 + tm_shape(x1)+tm_borders(alpha = 1,lwd = 2,col = 'black')
-x2 + tm_shape(buffer,name='True_buffer')+tm_polygons(alpha = .5) +
-  field_boundaries %>% tm_shape(name='True Boundaries') + tm_polygons(alpha=.5) +
-  tm_shape(samples,name='True Samples',)+tm_dots() #+
+# x2 + tm_shape(buffer,name='True_buffer')+tm_polygons(alpha = .5) +
+#   field_boundaries %>% tm_shape(name='True Boundaries') + tm_polygons(alpha=.5) +
+#   tm_shape(samples,name='True Samples',)+tm_dots() #+
 # tm_shape(tmp,name='is_outside') + tm_dots('index') +
 #  tm_shape(x1,name='Concave_boundary') + tm_polygons(alpha = .5) +
 # tm_shape(x1_buffer,name='Convave_buffer') + tm_polygons(alpha = .5) 
@@ -326,11 +327,10 @@ data[,acres := .25]
 data[,.(total_acres,summed=sum(acres)),'field_id'][,plot(summed,total_acres)]
 # fwrite(data,'ARF_Simulation/data/input/data.csv')
 
-### Create Subsets ----
 
 # x2 = quick_map(data,mode='plot',SB_Pos = 'left',basemap = T)
 
-### Select Columns
+### Select Columns ----
 data[,acres := .25]
 
 colnames(data) = colnames(data) %>% str_replace_all('-','_')
@@ -351,48 +351,74 @@ dir.create('ARF_Simulation/data/input/Leflore_Sets',showWarnings = F)
 dir.create('ARF_Simulation/data/input/Leflore_Sets/Input_Sets',showWarnings = F)
 dir.create('ARF_Simulation/data/input/Leflore_Sets/Training_Sets',showWarnings = F)
 
-## Full Region
-Region = 'Full'
-data$Region = Region
-fwrite(data[,..cols],paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'.csv'))
-fwrite(data[,..cols],paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'.csv'))
+### Model BD ----
 
+model = readRDS('ARF_Simulation/models/BD_RF')
+cols_x = model$xNames
+x = data[,..cols_x] %>% as.data.frame
+data$BD = predict(model,x)
 
-### Sub Regions
+get_toc = function(om,bd,depth,scale='hectare'){
+  # total carbon in metric tons = fraction of carbon (%om / 100) * BD g/cm * Volume m3
+  area = switch(scale,
+                'acre'=4046.86,
+                'hectare'=10000)
+  (om / 100) * bd * (area * depth/100) 
+}
 
-lapply(data$cl %>% unique,function(x){
+data$TOC = get_toc(data$om,data$BD,depth = 30,scale='acre')
+
+### Create Subsets ----
+
+## loop through different yvecs
+
+lapply(c('om','BD','TOC') ,\(yvec){
+  print(yvec)
+  data$om = data[,.SD,.SDcols=yvec]  
+
+  ## Full Region
+  Region = 'Full'
+  data$Region = Region
+  fwrite(data[,..cols],paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'__',yvec,'.csv'))
+  fwrite(data[,..cols],paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'__',yvec,'.csv'))
   
-  print(x)
-  x1 = data[cl==x,..cols]
-  Region = paste0('Region_',x)
   
-  fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'.csv'))
-  fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'.csv'))
-  if(length(unique(x1$cl_sub))>1){ 
-    lapply(x1$cl_sub %>% unique,function(y){
-      
-      x2 = x1[cl_sub==y]
-      Region = paste0('Sub_',x,'_',y)
-      x2$Region = Region
-      
-      fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'.csv'))
-      fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'.csv'))
-    })
-  }
+  ### Sub Regions
+  
+  lapply(data$cl %>% unique,function(x){
+    
+    print(x)
+    x1 = data[cl==x,..cols]
+    Region = paste0('Region_',x)
+    
+    fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'__',yvec,'.csv'))
+    fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'__',yvec,'.csv'))
+    if(length(unique(x1$cl_sub))>1){ 
+      lapply(x1$cl_sub %>% unique,function(y){
+        
+        x2 = x1[cl_sub==y]
+        Region = paste0('Sub_',x,'_',y)
+        x2$Region = Region
+        
+        fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'__',yvec,'.csv'))
+        fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'__',yvec,'.csv'))
+      })
+    }
+  })
+  
+  ### Individual Fields
+  
+  mclapply(data$field_id %>% unique,mc.cores=14,function(x){
+    print(x)
+    x1 = data[field_id==x,..cols]
+    
+    Region = paste0('field_',x,'__',x1$cl,'_',x1$cl_sub)[1]
+    
+    x1$Region = Region
+    
+    fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'__',yvec,'.csv'))
+    fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'__',yvec,'.csv'))
+  })
+  
 })
-
-### Individual Fields
-
-mclapply(data$field_id %>% unique,mc.cores=14,function(x){
-  print(x)
-  x1 = data[field_id==x,..cols]
-  
-  Region = paste0('field_',x,'__',x1$cl,'_',x1$cl_sub)[1]
-  
-  x1$Region = Region
-  
-  fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Training_Sets/',Region,'.csv'))
-  fwrite(x1,paste0('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/',Region,'.csv'))
-})
-
 
