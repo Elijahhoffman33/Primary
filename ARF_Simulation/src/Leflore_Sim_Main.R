@@ -1,167 +1,166 @@
-# Main Simulation ---- 
 source('src/General_Setup_Edit.R')
-
 source('../Soil_Stratification_Sampling/src/Functions/Strata_Sampling_Main.R')
 source('../Soil_Stratification_Sampling/Main_Wrapper.R')
 
-Regions = list.files('ARF_Simulation/data/input/Input_Sets') %>% str_remove('.csv')
+
+
 # Region = 'field_8248'
-Region = 'Full'
+# Region = 'Full'
 
-data = fread('ARF_Simulation/data/input/Input_Sets/Full.csv')
-strata = fread('ARF_Simulation/data/output/strata.gz')
-x = merge(data,strata[,.(voxel_id,strata_id)],by='voxel_id')
-quick_map(data,'cluster_label',basemap=T)
-quick_map(x,'strata_id',basemap=T,mode = 'view')
+# Dataset Viewing ----
 
-### Check AGT merging
-L = mclapply(unique(data$field_id),mc.cores=15,\(field_sub){
-  Main_Data = data %>% filter(field_id==field_sub)
-  Main_Data$cluster_label = as.character(Main_Data$cluster_label)
-  print(table(Main_Data$cluster_label))
-  print(Region)
-  n_voxels = 5/.25
-  tbl = table(Main_Data$cluster_label)
-  tbl = tbl[order(tbl)]
+data = fread('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/Full.csv')
+data = Rescale_om(data)
+Get_Weighted_Avg_Depths(data)
+
+data = data %>% filter(cl==1)
+
+cols = str_detect(colnames(data),paste(c('sg_soc','polaris_om','gssurgo_om_r','om'),collapse='|')) %>%
+  colnames(data)[.]
+cols = cols %>% str_detect('60|wdrvi|gssurgo_om_r_30') %>% '!'(.) %>% '['(cols,.)
+plot = data %>% melt(measure.vars=cols)
+plot$Origin = c('Sample',rep('SG',3),rep('Polaris',3),rep('Gssurgo',3))[plot$variable]
+
+# Simple Case
+plot = data %>% melt(measure.vars=c('sg_soc','polaris_om','gssurgo_om_r','om'))
+
+
+ggplot(plot,aes(x=value,fill=variable))+
+  geom_histogram(bins=200,alpha=.6,position = 'identity') +# scale_color_brewer(palette = 'Dark2') + scale_fill_brewer(palette = 'Dark2') +
+  # geom_density(alpha=.8,position = 'identity') + scale_color_brewer(palette = 'Dark2') + scale_fill_brewer(palette = 'Dark2') +
+  labs(x='%om') + theme_classic(base_size = 22) + #coord_cartesian(ylim = c(0,10000)) +
+  facet_wrap('Origin')
+
   
-  small_AGTs = which(tbl < n_voxels) %>% names(tbl)[.]
   
-  # Check for small AGTs, merge if present 
-  if(length(small_AGTs)>0){
-    
-    merge_small_AGTs(small_AGTs,Main_Data,n_voxels)
-    
-    print(table(Main_Data$cluster_label))
-  }
-  return(Main_Data)
-  
-})
 
-x = L %>% rbindlist
-quick_map(x,'cluster_label',basemap=T)
-
-### Single Run 
-# Main_Wrapper(input_path = '../Soil_Stratification_Sampling/Scratch/temp_dir/temp_dir/inference_data.csv.gz',
-#               training_path='../Soil_Stratification_Sampling/Scratch/temp_dir/temp_dir/training_data.csv.gz',
-#              field_boundary_path = '../Soil_Stratification_Sampling/Scratch/temp_dir/temp_dir/field_boundaries.gpkg',
-#              output_locations_path = 'data/output/Samples.gz','data/output/control_clusters.gz',output_strata_path = 'ARF_Simulation/data/output/strata.gz',
-#            max_iRF_samples=100,Force_iRF =c('polaris_ph','polaris_bd'),
-#            control_fields=F,Force_OM_Public='polaris_om',
-#            Force_OM_Source='Public_Predictions',
-#              Allow_Default=F)
-
-
-Main_Wrapper(input_path = 'ARF_Simulation/data/input/Input_Sets/Full.csv',
-             training_path='ARF_Simulation/data/input/Training_Sets/Full.csv',
-             field_boundary_path = 'ARF_Simulation/data/input/130_boundaries.gpkg',
-             output_locations_path = 'ARF_Simulation/data/output/Samples_test.gz',
-             output_control_cluster_path = 'ARF_Simulation/data/output/control_clusters.gz',
-             output_strata_path = 'ARF_Simulation/data/output/strata.gz',
-             max_iRF_samples=100,Force_iRF =c('cec','ca'),
-             control_fields=F,#Force_OM_Public='polaris_om',
-             # Force_OM_Source='Public_Predictions',
-             Allow_Default=F)
-###
+# Run Simulations ----
 library(tictoc)
 
-Max_Iter = 1
-which(Regions%in%Region)
+Regions_Leflore = list.files('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/') %>% str_remove('.csv') %>% 
+  rev
+Regions_ARF = list.files('ARF_Simulation/data/input/ARF_Sets/Input_Sets/') %>% str_remove('.csv') %>% 
+  rev
+
+Iters = 1
+# which(Regions%in%Region)
 # Regions = Regions[Regions %>% str_detect('field',negate=T)]
-for(I in 36:100){
-  dir.create(paste0('ARF_Simulation/data/output/Sim_',I))
+Region_Set = 'Leflore'
+
+for(Region_Set in c('Leflore','ARF')){
+  Regions = switch(Region_Set,
+         'Leflore'=Regions_Leflore,
+         'ARF'=Regions_ARF)
   
-  for(Region in Regions[1:length(Regions)]){
+  for(I in Iters){
+    dir.create(paste0('ARF_Simulation/data/output/Sim_',I))
     
-    # error = try({
-    # run_grid = data.table(OM_Source=c('Soil_Samples',rep('Public_Predictions',3)),
-    #                       OM_Var=c(F,'sg_soc','polaris_om','gssurgo_om_r'))
-    run_grid = data.table(OM_Source=c('Soil_Samples'),
-                          OM_Var=c(F))
-    for(i in 1:nrow(run_grid)){
-      run = run_grid[i,]
+    # for(Region in Regions[1:length(Regions)]){
+    for(Region in Regions){
       
-      input_path = list.files('ARF_Simulation/data/input/Input_Sets',pattern=Region,full.names = T)
-      training_path = list.files('ARF_Simulation/data/input/Input_Sets',pattern=Region,full.names = T)
+      # error = try({
+      # run_grid = data.table(OM_Source=c('Soil_Samples',rep('Public_Predictions',3)),
+      #                       OM_Var=c(F,'sg_soc','polaris_om','gssurgo_om_r'))
+      run_grid = data.table(OM_Source=rep('Soil_Samples',3),
+                            OM_Var=rep(F,3),Allocation=c('PPS','Neyman','Wright'))
+      # run_grid = data.table(OM_Source=c('Soil_Samples'),
+      #                       OM_Var=c(F))
       
-      OM_Var = ifelse(run$OM_Var=='FALSE',F,run$OM_Var)
-      
-      print(Region)
-      First_Iter = T
-      run_data = NULL
-      # L = lapply(1:Max_Iter,function(ii){
-      for(ii in 1:Max_Iter){
-        print(paste0('Iteration :',ii))
-        output_path = paste0('ARF_Simulation/data/output/',Region,'.csv.gz')
+      for(i in 1:nrow(run_grid)){
+        run = run_grid[i,]
         
+        input_path = list.files(paste0('ARF_Simulation/data/input/',Region_Set,'_Sets/Input_Sets'),pattern=Region,full.names = T)
+        training_path = list.files(paste0('ARF_Simulation/data/input/',Region_Set,'_Sets/Input_Sets'),pattern=Region,full.names = T)
         
-        tic('Run_Time')
+        OM_Var = ifelse(run$OM_Var=='FALSE',F,run$OM_Var)
+        Allocation = run$Allocation
         
-        if(First_Iter==(T|F)){
-          tmp = try(Main_Wrapper(input_path,training_path,output_locations_path = output_path,
-
-                             field_boundary_path = 'ARF_Simulation/data/input/130_boundaries.gpkg',
-                             output_strata_path =  'ARF_Simulation/data/output/strata_tmp.gz',
-                             control_fields = F,
-                             Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
-                             Force_iRF=F,Output_Summary=T,Cores_Global=8,
-                             Allow_Default=F,aggregate_at='strata',Max_Splits=7,
-                             Iterations = 200,Iter_Run = 15,Max_Features=3,
-                             max_iRF_samples=1000,
-                             Testing_Run=T,Min_Acres_Sample = 1,export_resamples=T))
+        print(Region)
+        First_Iter = T
+        run_data = NULL
+        # L = lapply(1:Max_Iter,function(ii){
+        for(ii in Iters){
+          print(paste0('Iteration :',ii))
+          output_path = paste0('ARF_Simulation/data/output/',Region,'.csv.gz')
           
-          if(class(tmp)=='try-error'){
-            break
+          
+          tic('Run_Time')
+          
+          if(First_Iter==(T|F)){
+            tmp = Main_Wrapper(input_path,training_path,output_locations_path = output_path,
+                                   
+                                   field_boundary_path = paste0('ARF_Simulation/data/input/',Region_Set,'_Inputs/field_boundaries.gpkg'),
+                                   output_strata_path =  'ARF_Simulation/data/output/strata_tmp.gz',
+                                   control_fields = F,
+                                   Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
+                                   Force_iRF=F,Output_Summary=T,Cores_Global=8,
+                                   Allow_Default=F,aggregate_at='strata',Max_Splits=4,
+                                   Iterations = 200,Iter_Run = 15,Max_Features=3,
+                                   max_iRF_samples=1000,allocation= Allocation,
+                                   Testing_Run=T,Min_Acres_Sample = 1,export_resamples=T)
+            
+            if(class(tmp)=='try-error'){
+              break
+            }
+            First_Iter <<- F
+            Selected_Features = tmp$Selected_Features
+            Selected_Features <<- tmp$Selected_Features
+            run_data <<- tmp$Run_Data
+            run_data <- tmp$Run_Data
+          } else{
+            tmp = try(Main_Wrapper(input_path,training_path,output_locations_path = output_path,
+                                   Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
+                                   Force_iRF=Selected_Features,Output_Summary=T,Cores_Global=8,
+                                   control_fields=F,Allow_Default=F,aggregate_at='strata'))
+            
+            if(class(tmp)=='try-error'){
+              break
+            }
+            
+            tmp$Run_Data = NULL
           }
-          First_Iter <<- F
-          Selected_Features = tmp$Selected_Features
-          Selected_Features <<- tmp$Selected_Features
-          run_data <<- tmp$Run_Data
-          run_data <- tmp$Run_Data
-        } else{
-          tmp = try(Main_Wrapper(input_path,training_path,output_locations_path = output_path,
-                                 Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
-                                 Force_iRF=Selected_Features,Output_Summary=T,Cores_Global=14,
-                                 control_fields=F,Allow_Default=F,aggregate_at='strata'))
           
-          if(class(tmp)=='try-error'){
-            break
-          }
+          toc(log = T)
           
-          tmp$Run_Data = NULL
-        }
+          time =  unlist(lapply(tic.log(format = F), function(x) x$toc - x$tic))
+          tic.clearlog()
+          
+          Max_Runs = tmp$Run_Index %>% sapply(max) %>% max
+          iRF_Skipped = ifelse(tmp$Config$Force_iRF==F,F,T)[[1]]
+          Run_Stats = data.table(Region=Region,OM_Source=tmp$Selected_OM,
+                                 Run_Iteration=ii,Acres=tmp$Summary$Total_Acres[[1]],
+                                 N_Voxels=run_data[,.N],Time_Elapsed=time,iRF_Skipped=iRF_Skipped,
+                                 Data_Size = object_size(run_data),
+                                 N_Iter=tmp$Config$Iter_Run*tmp$Config$Iterations,
+                                 Iter_Run=tmp$Config$Iter_Run,Iterations=tmp$Config$Iterations,
+                                 batch_limit=tmp$Config$batch_limit,
+                                 Max_Runs=Max_Runs)
+          
+          tmp$Run_Stats = Run_Stats
+          
+          ### For other targets
+          tmp$Summary
+          y = str_split(Region,'__')[[1]]
+          tmp$Target = y[[length(y)]]
+          
+          saveRDS(tmp,paste0('ARF_Simulation/data/output/Sim_',I,'/',Region,':RN_',i,'__',
+                             Region_Set,'__',':Iter_',ii))
+        }#)
         
-        toc(log = T)
-        
-        time =  unlist(lapply(tic.log(format = F), function(x) x$toc - x$tic))
-        tic.clearlog()
-        
-        Max_Runs = tmp$Run_Index %>% sapply(max) %>% max
-        iRF_Skipped = ifelse(tmp$Config$Force_iRF==F,F,T)[[1]]
-        Run_Stats = data.table(Region=Region,OM_Source=tmp$Selected_OM,
-                               Run_Iteration=ii,Acres=tmp$Summary$Total_Acres[[1]],
-                               N_Voxels=run_data[,.N],Time_Elapsed=time,iRF_Skipped=iRF_Skipped,
-                               Data_Size = object_size(run_data),
-                               N_Iter=tmp$Config$Iter_Run*tmp$Config$Iterations,
-                               Iter_Run=tmp$Config$Iter_Run,Iterations=tmp$Config$Iterations,
-                               batch_limit=tmp$Config$batch_limit,
-                               Max_Runs=Max_Runs)
-        
-        tmp$Run_Stats = Run_Stats
-        saveRDS(tmp,paste0('ARF_Simulation/data/output/Sim_',I,'/',Region,':RN_',i,':Iter_',ii))
-      }#)
+      }
       
-    }
-    
-  }#,Env)
+    }#,Env)
+  }
 }
-
 # Analysis ----
 
 ### Collect Results ----
-data = fread('ARF_Simulation/data/input/Input_Sets/Full.csv')
+data = fread('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/Full__om.csv')
 
 Rescale_om(data)
 Get_Weighted_Avg_Depths(data)
+
+
 
 get_samples = function(y,files){
   y1 = str_detect(files,y$Region) %>% which %>% files[.] 
@@ -173,13 +172,63 @@ get_samples = function(y,files){
 
 
 Dirs = list.files('ARF_Simulation/data/output/',full.names=F,pattern='Sim_')
-Dir = 'Sim_33'
+Dir = 'Sim_1'
 
 files = list.files(paste0('ARF_Simulation/data/output/',Dir,'/'),full.names=T)
 L = files %>% lapply(readRDS)
 names(L) =
   files %>% strsplit('//') %>% sapply(.,'[[',2) %>% 
   strsplit(':') %>% sapply(.,'[[',1) 
+
+### Sampling testing 5/19/22 ----
+
+tmap_options(max.raster = c(plot = 1e8, view = 1e8))
+
+get_strata = function(x,strata,mode=NULL){
+  index = which(names(x$Run_Index)==strata)
+  x1 = x$Strata_Data[[index]]$Partitions[index,]
+  x$Run_Data[,(strata) := x1]
+  
+  if(!is.null(mode)){
+    
+    t1 = quick_map(x$Run_Data,basemap = T)
+    plot = x$Run_Data %>% get_SF
+    tmap_mode('view')
+    t1 + SF_Raster(plot,strata,simple = T,Res = sqrt(Acre_M*.26))[[1]] %>% 
+      tm_shape(name = 'Strata') + tm_raster(alpha = .4,palette = 'Dark2')
+    
+  } else{
+    quick_map(x$Run_Data,strata,basemap = T)
+  }
+}
+
+x = L$Sub_3_3__TOC
+
+get_strata(x,'om:3')
+get_strata(x,'om:2')
+get_strata(x,'om:0')
+
+get_strata(x,'om:3','hek')
+
+regime = x$Selected
+regime$n_samples = 35
+x$Run_Data$Strata = x$Run_Data$`om:3`
+Allocate_Strata(x$Run_Data,regime$Allocation)
+
+y = pull_samples(regime,
+             data_tmp=x$Run_Data)
+y[,mean(om),'om:3']
+y[,.SD[,.N,'om:3'][,N/.N]]
+y[,.SD[,.N,'om:3'][,.(Strata=.SD[[1]],
+                      Proportion = N/regime$n_samples )]]
+
+z = x$Run_Data
+optimum_allocation(data = z, strata = "Strata", 
+                   y = "om",
+                   nsample = regime$n, method = "Neyman")
+
+x1 = optimStrat::optiallo(regime$n,z$om,stratum=z$Strata) %>% as.data.table %>% distinct
+x1[order(stratum)]
 
 
 ## 3/23/22 plotting----
@@ -190,12 +239,13 @@ Sim_Summary = L$Full$Summary
 plot = lapply(1:length(L),\(j){
   span=1
   x = L[[j]]
-  gg <- ggplot(x$Summary[E_Prob<.03&Acres_Sample<100&str_detect(Strata,'ooga|u|2|3',negate=T)],#&
+  gg <- ggplot(x$Summary[E_Prob<100&Acres_Sample<1000&str_detect(Strata,'om')],#&
                # gg <- ggplot(x$Summary[Acres_Sample<100&str_detect(Strata,'ooga|u|2|3',negate=T0)#&
                #                        str_detect(Strata,'AGT',negate=F)],
                
                aes(x=Acres_Sample,y=E_Prob*100,col=Strata)) + theme_classic()+# ,linetype=Year geom_point(alpha=.5,size=1)
-    geom_point(alpha=0,size=.5) + labs(color='Strata') +geom_line(stat='smooth',se = F,method = 'loess',span=span,alpha=1) #  cut(round(N_Ratio),16)
+    geom_point(alpha=.4,size=.5) + labs(color='Strata') +geom_line(stat='smooth',se = F,method = 'loess',span=span,alpha=1) #  cut(round(N_Ratio),16)
+  gg
   # gg = gg + facet_wrap(~Region) + geom_vline(data=dataLine,aes(xintercept=int),alpha=.4)
   gg = gg + theme_classic(base_size = 18) + geom_abline(intercept =3,slope=0,alpha=.5)#+ ylim(0,NA) #+ geom_hline(yintercept=1,alpha=.4) +
   gg
@@ -265,23 +315,23 @@ Summary = parallel::mclapply(Dirs,mc.cores=1,function(Dir){
   x = lapply(L,'[[','Run_Stats') %>% rbindlist
   x[,Run_Iteration:=paste0(Dir,'_',Run_Iteration)]
   # x[,1:3]
-
+  
   ### Get Results Stats
-
+  
   Mean_SD = lapply(L,function(y){
     
     run_data = y$Run_Data
-
+    
     samples = rbindlist(y$Output_Samples_Resamples,idcol = 'Iter')
     Avgs = samples[,.(True_Mean=mean(run_data$om),True_SD=sd(run_data$om),
-    
+                      
                       Sim_Mean=mean(om),Sim_SD=sd(om),N_Samples=.N),'Iter']
     return(list(Avgs,list(samples=samples)))
   })
-
+  
   Summary = lapply(seq_along(Mean_SD),\(y) {
     cbind( x[y,], '[['(Mean_SD[[y]],1) ) 
-    }) %>% rbindlist 
+  }) %>% rbindlist 
   
   Sample_L = lapply(Mean_SD,\(x) x[[2]]$samples)
   
@@ -363,7 +413,7 @@ ggplot(plot[Iter==1,], aes(x=Index, y=Avg_Mean)) + #col=Control_Clusters,
   geom_point(data=plot,aes(x=Index,y=Sim_Mean,col=Within_5),size=1) + 
   geom_point(data=plot,aes(x=Index,y=True_Mean)) + 
   scale_x_discrete(breaks = 1:47,
-
+                   
                    labels = labels) +
   theme(axis.text.x = element_text(angle = 90, vjust = +.5, hjust=0))
 
@@ -419,9 +469,9 @@ x = st_read('ARF_Simulation/data/input/locus_samples_20220221.gpkg')
 quick_map(data,'polaris_om',mode='plot',style = 'bclust',Lhist = T,n=6,
           legend_size = .4,basemap = F,SB_Width = .3,SB_Pos = 'left') #+
 
-
 data$cl = data$cl %>% as.factor()
 
+plot = data %>% melt(measure.vars=c('sg_soc','polaris_om','gssurgo_om_r'))
 
 # plot[,value:=value %>% scale(scale = T,center=T),'variable']
 # plot$om = scale(plot$om)
@@ -433,26 +483,10 @@ Ras %>% scale(scale = T,center = T) %>% hist
 #   theme_classic(base_size = 22) + scale_color_brewer(palette = 'Dark2') + scale_fill_brewer(palette = 'Dark2') +
 #   labs(x='%om')
 
-data = fread('ARF_Simulation/data/input/Input_Sets/Full.csv')
-
-Rescale_om(data)
-Get_Weighted_Avg_Depths(data)
-
-data$cl = data$cl %>% as.factor()
-
-
-plot = data %>% melt(measure.vars=c('sg_soc','polaris_om','gssurgo_om_r'))
-
-dir.create('ARF_Simulation/scratch/Public_Vs_Measured_Plots')
-gg1 = ggplot(plot,aes(x=value,fill=variable))+
+ggplot(plot,aes(x=value,fill=variable))+
   geom_histogram(bins=150,alpha=.8,position = 'identity') + scale_color_brewer(palette = 'Dark2') + scale_fill_brewer(palette = 'Dark2') +
   labs(x='%om') + theme_classic(base_size = 22) + coord_cartesian(ylim = c(0,2000)) 
-gg1
-ggsave(gg1,filename = 'ARF_Simulation/scratch/Public_Vs_Measured_Plots/ARF_histograms.png')
-# density version 
-ggplot(plot,aes(x=value,fill=variable))+
-  geom_density(bins=150,alpha=.8,position = 'identity') + scale_color_brewer(palette = 'Dark2') + scale_fill_brewer(palette = 'Dark2') +
-  labs(x='%om') + theme_classic(base_size = 22) + coord_cartesian(ylim = c(0,20)) 
+
 
 ### Actual versus predicted 
 
@@ -476,24 +510,19 @@ ggplot(plot,aes(x=variable,y=om-value,fill=variable))+
   geom_boxplot(width=.1,outlier.size=.5,outlier.alpha = 0,alpha=0) + 
   stat_summary(fun=mean, geom="point", shape=20,size=5) 
 
-### Summary Stats
+
+### Metrics Summary ----
 library(Metrics)
 cols = c('polaris_om','sg_soc','gssurgo_om_r','om')
+data = data %>% filter(cl==1)
 
-data[,.(Variable=cols,'R^2'=lapply(.SD,rsq,actual=om),MSE=lapply(.SD,mse,actual=om),MdAE=lapply(.SD,mdae,actual=om),
-        SD=lapply(.SD,sd),Mean=lapply(.SD,mean)),
-     .SDcols=cols] 
-
-
-### Summary over
-library(Metrics)
-cols = c('polaris_om','sg_soc','gssurgo_om_r','om')
 data1 = copy(data)
 data1[,(cols):=lapply(.SD,scale),.SDcols=cols]
+data1 = data1[!is.na(data$gssurgo_om_r)]
 
 x = data1[,.(Variable=cols,'R^2'=lapply(.SD,rsq,actual=om),MSE=lapply(.SD,mse,actual=om),MdAE=lapply(.SD,mdae,actual=om),
              SD=lapply(.SD,sd),Mean=lapply(.SD,mean)),
-          .SDcols=cols] 
+          .SDcols=cols,'cl'] 
 x
 
 x = data[,.(Variable=cols,cor=lapply(.SD,cor,om)),by='field_id',
@@ -547,164 +576,4 @@ Ras  %>% hist
 
 
 quick_map(data,'polaris_om')
-
-
-#
-# Control Plots ----
-### Get management practices 
-
-library(jsonlite)
-library(stringdist)
-library(dendextend)
-library(ComplexHeatmap)
-library(factoextra)
-
-json = fromJSON("ARF_Simulation/data/input/mgmt_dict.json") %>% fromJSON 
-str(json,list.len = 2,max.level = 5)
-json %>% sapply(names)
-json %>% sapply(Dim)
-
-MGMT = lapply(json,function(x){
-  sapply(x,unlist) %>% as.data.table
-}) %>% rbindlist
-# MGMT$Practices = names(json) %>% sapply(rep,6) %>% as.vector
-x = apply(MGMT,2,paste,collapse='')
-
-M = stringdistmatrix(x)
-M %>% as.matrix() %>% Heatmap
-
-row_dend = as.dendrogram(hclust(dist(M),method='ward.D2'))
-row_dend = color_branches(row_dend, k = 3)
-plot(row_dend)
-
-fv = fviz_nbclust(M %>% as.matrix, hcut,k.max = 30,  method = "gap_stat", nboot = 100,
-                  maxSE = list(method = "Tibs2001SEmax", SE.factor = 1))+
-  labs(subtitle = "Gap statistic method",)
-
-fv
-
-gskmn <- clusGap(M %>% as.matrix, FUN = hcut, K.max = 30, B = 300)
-plot(gskmn)
-maxSE(f = gskmn$Tab[, "gap"], SE.f = gskmn$Tab[, "SE.sim"])
-
-
-Heatmap(M %>% as.matrix,cluster_rows = row_dend, cluster_columns = row_dend)
-
-MGMT_cl = data.table(field_id=names(x))
-lapply(1:20,\(y){
-  cl = hcut(M,y,hc_method = 'ward.D2')$cluster
-  col = paste0('cl_',y)
-  MGMT_cl[,(col):=cl]
-  
-})
-# cl = hcut(M,3,hc_method = 'ward.D2')$cluster
-# MGMT_cl = data.table(field_id=names(x),cl=cl)
-
-### Soil texture ----
-
-library(soiltexture)
-
-data[,tot_text := gssurgo_claytotal_r+gssurgo_silttotal_r+gssurgo_sandtotal_r]
-data$tot_text = data$tot_text %>% as.character
-
-
-data = lapply(data$tot_text %>% unique,function(x){
-  x1 = data[tot_text==x]
-  x2 = TT.points.in.classes(x1,class.sys = 'USDA.TT',text.tol = as.numeric(x),
-                            css.names = c("gssurgo_claytotal_r","gssurgo_silttotal_r","gssurgo_sandtotal_r"))
-  
-  index = apply(x2,1,function(x){
-    which(x==1)
-  }) 
-  x1$Soil_Texture = colnames(x2)[index]
-  x1
-}) %>% rbindlist
-index = colnames(data) %>% duplicated %>% '!'(.) %>% which 
-data = data[,..index]
-
-data = merge(data,data[,.(Avg_Soil_Texture=which.max(table(Soil_Texture)) %>% 
-                            names(table(Soil_Texture))[.]),'field_id'],by='field_id')
-data$Avg_Soil_Texture = as.factor(data$Avg_Soil_Texture)
-quick_map(data,'Avg_Soil_Texture',basemap=T,SB_Pos = 'left')
-
-
-
-### Slope Class ----
-
-data$Slope_Class = get_breaks(data$topo_slope,style = 'fixed',breaks=c(0,4,9,17,31,45,100))
-quick_map(data,'Slope_Class',basemap=T,SB_Pos = 'left')
-
-data = merge(data,data[,.(Avg_Slope_Class=which.max(table(Slope_Class)) %>%
-                            names(table(Slope_Class))[.]),'field_id'],by='field_id')
-data$Avg_Soil_Texture = as.factor(data$Avg_Soil_Texture)
-quick_map(data,'Slope_Class',basemap=T,SB_Pos = 'left')
-
-
-
-
-## Merge Criteria / OM importance testing ----
-
-MGMT_cl$field_id = as.numeric(MGMT_cl$field_id)
-setnames(MGMT_cl,'cl','Practice_Cluster')
-
-data = merge(data,MGMT_cl,by='field_id')
-
-### Manual selection of cluster
-data$Practice_Cluster = data$cl_4
-quick_map(data,'Practice_Cluster',basemap=T,SB_Pos = 'left')
-
-### Create Control Clusters
-data[,Control_Clusters:=paste(Avg_Soil_Texture,Avg_Slope_Class,Practice_Cluster,sep='_')]
-data[,length(unique(field_id)),c('Control_Clusters')]
-quick_map(data,'Control_Clusters',basemap=T,SB_Pos = 'left')
-
-
-### Quick Stats
-data[,mean(om),c('Practice_Cluster','field_id')]
-
-# ### Averaging
-
-# Results_Avg = Results[,.(Lower_CI_True=mean(Lower_CI_True),Upper_CI_True=mean(Upper_CI_True),
-#                          Lower_CI_Sim=mean(Lower_CI_Sim),Upper_CI_Sim=mean(Upper_CI_Sim),
-#                          True_Mean=mean(True_Mean),True_SD=mean(True_SD),
-#                          Sim_Mean=mean(Sim_Mean),Sim_SD=mean(Sim_SD)),
-#                       by=c('Region','OM_Source')]
-# 
-# Results_Avg[,':='(True_CI_Len=Upper_CI_True-Lower_CI_True,Sim_CI_Len=Upper_CI_Sim-Lower_CI_Sim)]
-# 
-# Results_Avg[,Region:=str_remove_all(Region,'field_') %>% as.numeric]
-
-
-### Testing
-# Results[OM_Source=='om'&Region %>% str_detect('field'),
-#         .(Lower_CI_True=mean(Lower_CI_True),Upper_CI_True=mean(Upper_CI_True),
-#           Lower_CI_Sim=mean(Lower_CI_Sim),Upper_CI_Sim_SD=mean(Upper_CI_Sim),
-#           True_Mean=mean(True_Mean),True_SD=mean(True_SD),
-#           Sim_Mean=mean(Sim_Mean),Sim_SD=mean(Sim_SD)),
-#         by=c('Region','OM_Source')]
-# 
-# Results[OM_Source=='om'&Region %>% str_detect('field'),
-#         .(Sim_CI_Len=mean(Upper_CI_Sim-Lower_CI_Sim),Sim_CI_Len_SD=sd(Upper_CI_Sim-Lower_CI_Sim)),
-#         by=c('Region','OM_Source')]
-
-
-### Subset samples 
-Results[,Unique_Iter:=seq(.N),c('Region','OM_Source')]
-Results[,Region:=str_remove_all(Region,'field_') %>% as.numeric]
-
-max_iter = Results[,Unique_Iter %>% max,c('Region','OM_Source')][[3]] %>% min
-Iter = 1
-
-
-
-sapply(Ctrl_Iters,\(x) x[[1]]) %>% unlist %>% table %>% sort(T)
-tmp = lapply(seq(length(Ctrl_Iters)),\(x) {
-  x1 = Ctrl_Iters[[x]][[2]]
-  Region = Ctrl_Iters[[x]][[1]]
-  x1 = cbind(Region,x1)
-  x1$Iter=x
-  x1
-}) %>% rbindlist
-
-tmp
 
