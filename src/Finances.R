@@ -80,7 +80,50 @@ print(paste0('Reduce federal tax to: ',
 
 
 
+### Taxes 2021 ----
 
+Gas = 1347 
+
+Parking = 600
+Tolls = 90 + 25*3
+M_Shops = 473 + 69 
+Parts = 36 + 51 + 36
+Washing = 270 + 15 * 4
+
+# Aproximate
+Car_Insurance = 125*12
+Car_cost = 20930
+dmv = 271 
+car_interest3.99
+# Computer
+
+79 + 16+ 195 +77 +395 + 20 + 800 
+
+Office_Space = (105/12)*(138/12)
+
+Electricity = 36+44+35+70+52+59+7
+(2009+2017+2068+2071+2071+2090) - (1900*6) - 600 # rent parking
+Other_Utilities = 326
+Electricity + Other_Utilities
+
+# Car 
+car_insurance= 125
+car_payment = 140
+
+
+# Car Mileage 
+
+TN_to_OR = 2900 * 2
+
+47300-31499 - 6000
+55900 - 47300
+TN_May = 40503
+CA_April_2 = 55900
+
+
+Gym = 38 * 3 * 4 *12
+# Final rough
+(16000 - 6000) / 2
 
 ### Shyanne ----
 

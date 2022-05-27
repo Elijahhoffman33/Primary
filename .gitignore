@@ -19,3 +19,8 @@ ARF_Simulation/data/**
 *.zip
 Hillary_SLM/Polaris_SOC_5_15
 Hillary_SLM/Workspace_1_26_22
+USDA_Grant_Figures/data/
+USDA_Grant_Figures/documents/USDA Grant Soil Sampling summary.docx
+ARF_Simulation/models/
+USDA_Grant_Figures/documents/
+USDA_Data/data/
