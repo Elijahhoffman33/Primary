@@ -266,8 +266,8 @@ lapply(c('om','BD','TOC') ,\(yvec){
   ## Full Region
   Region = 'Full'
   data$Region = Region
-  fwrite(data[,..cols],paste0('ARF_Simulation/data/input/Training_Sets/',Region,'__',yvec,'.csv'))
-  fwrite(data[,..cols],paste0('ARF_Simulation/data/input/Input_Sets/',Region,'__',yvec,'.csv'))
+  fwrite(data[,..cols_out],paste0('ARF_Simulation/data/input/Training_Sets/',Region,'__',yvec,'.csv'))
+  fwrite(data[,..cols_out],paste0('ARF_Simulation/data/input/Input_Sets/',Region,'__',yvec,'.csv'))
   
   
   ### Sub Regions
@@ -303,7 +303,7 @@ lapply(c('om','BD','TOC') ,\(yvec){
     x1$Region = Region
     x1$cl = NULL
     fwrite(x1,paste0('ARF_Simulation/data/input/Training_Sets/',Region,'__',yvec,'.csv'))
-    x1 = data[field_id==x,..cols]
+    x1 = data[field_id==x,..cols_out]
     x1$cl = NULL
     fwrite(x1,paste0('ARF_Simulation/data/input/Input_Sets/',Region,'__',yvec,'.csv'))
   })

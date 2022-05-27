@@ -37,17 +37,19 @@ ggplot(plot,aes(x=value,fill=variable))+
 # Run Simulations ----
 library(tictoc)
 
-Regions_Leflore = list.files('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/') %>% str_remove('.csv') %>% 
-  rev
+Regions_Leflore = list.files('ARF_Simulation/data/input/Leflore_Sets/Input_Sets/') %>% str_remove('.csv') 
 Regions_ARF = list.files('ARF_Simulation/data/input/ARF_Sets/Input_Sets/') %>% str_remove('.csv') %>% 
-  rev
+  rev %>% .[str_detect(Regions_ARF,'__')]
 
 Iters = 1
-# which(Regions%in%Region)
+completed = list.files('ARF_Simulation/data/output/Sim_1/') 
+index = which(str_detect(Regions_ARF,paste(str_split(completed,':') %>% sapply(\(x) x[[1]])
+                                           ,collapse = '|'),negate=T))
+Regions_ARF = Regions_ARF[index] 
 # Regions = Regions[Regions %>% str_detect('field',negate=T)]
 Region_Set = 'Leflore'
 
-for(Region_Set in c('Leflore','ARF')){
+for(Region_Set in c('Leflore')){
   Regions = switch(Region_Set,
          'Leflore'=Regions_Leflore,
          'ARF'=Regions_ARF)
@@ -89,8 +91,8 @@ for(Region_Set in c('Leflore','ARF')){
           if(First_Iter==(T|F)){
             tmp = Main_Wrapper(input_path,training_path,output_locations_path = output_path,
                                    
-                                   field_boundary_path = paste0('ARF_Simulation/data/input/',Region_Set,'_Inputs/field_boundaries.gpkg'),
-                                   output_strata_path =  'ARF_Simulation/data/output/strata_tmp.gz',
+                               field_boundary_path = paste0('ARF_Simulation/data/input/',Region_Set,'_Field_Boundaries.gpkg'),
+                               output_strata_path =  'ARF_Simulation/data/output/strata_tmp.gz',
                                    control_fields = F,
                                    Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
                                    Force_iRF=F,Output_Summary=T,Cores_Global=8,
@@ -110,7 +112,7 @@ for(Region_Set in c('Leflore','ARF')){
           } else{
             tmp = try(Main_Wrapper(input_path,training_path,output_locations_path = output_path,
                                    Region=Region,Force_OM_Source=run$OM_Source,Force_OM_Public=OM_Var,
-                                   Force_iRF=Selected_Features,Output_Summary=T,Cores_Global=8,
+                                   Force_iRF=Selected_Features,Output_Summary=T,Cores_Global=13,
                                    control_fields=F,Allow_Default=F,aggregate_at='strata'))
             
             if(class(tmp)=='try-error'){
